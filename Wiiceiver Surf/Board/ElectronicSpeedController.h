@@ -17,13 +17,13 @@
  *
  * http://austindavid.com/wiiceiver
  *  
- * latest software: https://github.com/jaustindavid/wiiceiver
- * schematic & parts: http://www.digikey.com/schemeit#t9g
+ * latest software & hardware: https://github.com/jaustindavid/wiiceiver
  *
  * Enjoy!  Be safe! 
  * 
  * (CC BY-NC-SA 4.0) Austin David, austin@austindavid.com
  * 12 May 2014
+ * 02 Apr 2016
  *
  */
 
@@ -40,8 +40,8 @@ class ElectronicSpeedController {
 
 
 private:
-  bool dualESC;
-  Servo _esc1, _esc2;
+  bool multiESC = false;
+  SoftwareServo _esc1, _esc2, _esc3, _esc4;
   int angle;                // the angle most recently written to _esc;
   int angleCtr;
   int microseconds;         // the time (ms) most recently written
@@ -49,23 +49,29 @@ private:
 
 public:
 
-  void init(int pin1, int pin2) {
+  void init(byte pin1) {
+    init(pin1, 0, 0, 0);
+  }
+  
+  void init(byte pin1, byte pin2, byte pin3, byte pin4) {
     angle = -1;
     angleCtr = 0;
     lastWrite = 0;
     #ifdef DEBUGGING_ESC
       Serial.print("attaching to pin1 #");
-      Serial.println(pin1);
+      Serial.print(pin1);
       Serial.print(", pin2 #");
       Serial.print(pin2);
     #endif
-    _esc1.attach(pin1, 1000, 2000);
-    if (pin2) {
-      dualESC = true;
-      _esc2.attach(pin2, 1000, 2000);
-      Serial.println("Dual ESC!");
+    _esc1.attach(pin1);
+    if (pin2 && pin3 && pin4) {
+      multiESC = true;
+      _esc2.attach(pin2);
+      _esc3.attach(pin3);
+      _esc4.attach(pin4);
+      Serial.println("Multi ESC!");
     } else {
-      dualESC = false;
+      multiESC = false;
     }
     
     
@@ -111,33 +117,27 @@ public:
     if (newAngle != angle) {
       #ifdef DEBUGGING_ESC
         Serial.print(millis());
-        Serial.print(F(": ESC old: "));
-        Serial.print(_esc1.readMicroseconds());
-        Serial.print(F("us; new angle: "));
-        Serial.print(newAngle);
-        Serial.print(F(" = "));
+        Serial.print(F("new angle: "));
+        Serial.println(newAngle);
       #endif
       angle = newAngle;
       angleCtr = 0;
       _esc1.write(angle);
-      if (dualESC) {
+      if (multiESC) {
         _esc2.write(angle);
+        _esc3.write(angle);
+        _esc4.write(angle);
       }
-      #ifdef DEBUGGING_ESC
-          Serial.print(F(": ESC now: "));
-          Serial.println(_esc1.readMicroseconds());
-      #endif
       
       lastWrite = millis();
-    } 
-    #ifdef ESC_JITTER
-    else {
+      /*
+    } else {
+      
       if (angleCtr++ > 10) {
-        angleCtr = 0;
         setLevel(level + 0.01);
       }
+      */
     }
-    #endif
   } // void setLevel(float level)
 
 

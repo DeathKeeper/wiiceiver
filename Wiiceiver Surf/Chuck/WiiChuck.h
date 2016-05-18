@@ -27,8 +27,8 @@
  *
  */
  
-#ifndef CHUCK_H
-#define CHUCK_H
+#ifndef WIICHUCK_H
+#define WIICHUCK_H
 
 /*
  *  A "tiny" Wii Nunchuck class
@@ -66,10 +66,12 @@ class Chuck {
 #define DEFAULT_X_ZERO 128
 
 private:
-  byte status[6], lastStatus[6];
+  byte lastStatus[6];
   byte Y0, Ymin, Ymax, X0, Xmin, Xmax;
   word lastActivity, activitySamenessCount;
+  
 public:
+  byte status[6];
   float X, Y;
   bool C, Z;
 
@@ -162,55 +164,23 @@ private:
       saveLastStatus();
     }
     
-#ifdef DEBUGGING_CHUCK_ACTIVITY
-    Serial.print(F("CHUCK: "));
-    for (int i = 0; i < 5; i++) {
-      Serial.print(F(" ["));
-      Serial.print(status[i], DEC);
-      Serial.print(F("]"));
-    }
-    Serial.print(F("; sameness "));
-    Serial.print(activitySamenessCount);    
-    Serial.println();
-#endif
+    #ifdef DEBUGGING_CHUCK_ACTIVITY
+      Serial.print(F("CHUCK: "));
+      for (int i = 0; i <= 5; i++) {
+        Serial.print(F(" ["));
+        Serial.print(status[i], DEC);
+        Serial.print(F("]"));
+      }
+      Serial.print(F("; sameness "));
+      Serial.print(activitySamenessCount);    
+      Serial.println();
+    #endif
 
 
   } // _computeStatus(void)
 
 
 public:
-
-  void readEEPROM() {
-    byte storedY;
-
-    storedY = EEPROM.read(EEPROM_Y_ADDY);
-#ifdef DEBUGGING_CHUCK
-    Serial.print(F("Reading stored value: Y="));
-    Serial.println(storedY);
-#endif
-
-    // sanity check: they shouldn't differ by more than 25 units (~10%)
-    if (abs(storedY - DEFAULT_Y_ZERO) <= 25) {
-      Y0 = storedY;
-#ifdef DEBUGGING_CHUCK
-      Serial.println(F("Using stored value"));
-#endif
-} 
-    else {
-#ifdef DEBUGGING_CHUCK
-      Serial.println(F("Ingoring stored value"));
-#endif
-    }
-  } // readEEPROM()
-
-
-  void writeEEPROM() {
-    EEPROM.update(EEPROM_Y_ADDY, Y0);
-#ifdef DEBUGGING_CHUCK
-    Serial.print(F("Storing value: Y="));
-    Serial.println(Y0);	
-#endif	    
-  } // writeEEPROM()
 
 
   void calibrateCenter() {

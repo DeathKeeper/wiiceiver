@@ -17,13 +17,13 @@
  *
  * http://austindavid.com/wiiceiver
  *  
- * latest software: https://github.com/jaustindavid/wiiceiver
- * schematic & parts: http://www.digikey.com/schemeit#t9g
+ * latest software & hardware: https://github.com/jaustindavid/wiiceiver
  *
  * Enjoy!  Be safe! 
  * 
  * (CC BY-NC-SA 4.0) Austin David, austin@austindavid.com
  * 12 May 2014
+ * 02 Apr 2016
  *
  */
 

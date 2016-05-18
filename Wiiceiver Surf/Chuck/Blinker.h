@@ -17,8 +17,8 @@
  *
  * http://austindavid.com/wiiceiver
  *  
- * latest software & schematic: 
- *    https://github.com/jaustindavid/wiiceiver
+ * latest software: https://github.com/jaustindavid/wiiceiver
+ * schematic & parts: http://www.digikey.com/schemeit#t9g
  *
  * Enjoy!  Be safe! 
  * 
@@ -58,8 +58,8 @@ class Blinker {
     void start(int BPS);
     void update(int BPS);
     void run(void);
-	void high(void);
-	void low(void);
+    void high(void);
+    void low(void);
     void stop(void);
   private:
     void _blink(int level);
@@ -87,7 +87,7 @@ void Blinker::init(int LED) {
 // asynch run; if appropriate, will turn the LED on / off
 void Blinker::run(void) {
   // shortcut: not blinking?
-  if (_nextMillis == 0) {
+  if (_nextMillis == 0 || _bps == 0) {
     return;
   }
 
@@ -139,14 +139,14 @@ void Blinker::stop(void) {
 
 // stop blinking & remain HIGH
 void Blinker::high(void) {
-	stop();
-	_blink(HIGH);
+    stop();
+    _blink(HIGH);
 } // void Blinker::high(void)
 
 
 // stop blinking & remain LOW, same as stop()
 void Blinker::low(void) {
-	stop();
+  stop();
 } // void Blinker::high(void)
 
 
@@ -156,9 +156,9 @@ void Blinker::_blink(int level) {
   digitalWrite(_led, level);
 #ifdef BLINKY_DEBUG
   Serial.print(level);
-  Serial.print(": next in Millis: ");
+  Serial.print(F(": next in Millis: "));
   Serial.println(_nextMillis);
 #endif
-} // void Blinker::_show(int level)
+} // void Blinker::_blink(int level)
 
 #endif

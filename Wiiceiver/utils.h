@@ -61,6 +61,11 @@
 #define WII_SDA_ID   5
 
 
+typedef struct Settings {
+  bool HELI_MODE = false;
+};
+Settings settings;
+
  
 int CSEL = -1;
 void chipSelect (void) {
@@ -80,7 +85,7 @@ void chipSelect (void) {
   }
   
 #ifdef DEBUGGING_PINS
-    Serial.print("Smells like v");
+    Serial.print(F("Smells like v"));
     Serial.println(CSEL);
 #endif
 }
@@ -98,9 +103,9 @@ int pinLocation(int pinID) {
     {7,   6,  6},  // GREEN_LED   any digital pin
     {10,  9,  9},  // ESC_PPM     PWM required
     {9,  11,  5},  // WII_POWER   any digital pin
-    {19, 19, 19},  // WII_SCL     A5, don't change
-    {18, 18, 18},  // WII_SDA     A4, don't change
-    {0,  10, 10},  // ESC2_PPM    PWM required
+    {19, 19, 19}, // WII_SCL     A5, don't change
+    {18, 18, 18}, // WII_SDA     A4, don't change
+    {0,  10, 10}, // ESC2_PPM    PWM required
   };
   
   if (CSEL < 0) {
@@ -108,13 +113,68 @@ int pinLocation(int pinID) {
   }
   
   int pin = pinMap[pinID][CSEL];
-#ifdef DEBUGGING_PINS
-  Serial.print("pin location: [");
-  Serial.print(pinID);
-  Serial.print("][");
-  Serial.print(CSEL);
-  Serial.print("] == ");
-  Serial.println(pin);
-#endif
+  #ifdef DEBUGGING_PINS
+    Serial.print(F("pin location: ["));
+    Serial.print(pinID);
+    Serial.print(F("]["));
+    Serial.print(CSEL);
+    Serial.print(F("] == "));
+    Serial.println(pin);
+  #endif
   return pin;
 } // int pinLocation(int pinID)
+
+
+// reads a setting from an EEPROM address, returns that or a default
+// note that uninitialized EEPROM is all ones
+byte readSetting(int eeprom_addy, byte default_value) {
+  byte value = EEPROM.read(eeprom_addy);
+  return value == 255 ? default_value : value;
+} // byte readSetting(int eeprom_addy, byte default_value)
+
+
+// reads the acceleration profile setting (default: 3) and returns a
+// multiplier [0.5 .. zillion]
+float getProfileMultiplier(void) {
+    byte accelProfile = readSetting(EEPROM_ACCELPROFILE_ADDY, 4);
+    float multiplier = 1.0;
+    
+    switch (accelProfile) {
+      case 1: 
+        multiplier = 0.25;
+        break;
+      case 2:
+        multiplier = 0.50;
+        break;
+      case 3: 
+        multiplier = 0.75;
+        break;
+      case 5:
+        multiplier = 1.5;
+        break;
+      case 6:
+        multiplier = 2.0;
+        break;
+      case 7: // raw input, basically
+        multiplier = 100.0;
+        break;
+      case 4: // FALLTHROUGH
+      default:
+        multiplier = 1.0;
+        break;
+    }
+    return multiplier;
+} // float getProfileMultiplier()
+
+
+void readSettings(void) {
+  #ifdef ALLOW_HELI_MODE
+    settings.HELI_MODE = (readSetting(EEPROM_HELI_MODE_ADDY, 1) == 2);
+    if (settings.HELI_MODE) {
+      Serial.println(F("HELI MODE"));
+    }
+  #else
+    settings.HELI_MODE = 0;
+  #endif
+} // readSettings()
+

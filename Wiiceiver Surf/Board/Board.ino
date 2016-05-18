@@ -17,28 +17,48 @@
  *
  * http://austindavid.com/wiiceiver
  *  
- * latest software: https://github.com/jaustindavid/wiiceiver
- * schematic & parts: http://www.digikey.com/schemeit#t9g
+ * latest software & hardware: https://github.com/jaustindavid/wiiceiver
  *
  * Enjoy!  Be safe! 
  * 
  * (CC BY-NC-SA 4.0) Austin David, austin@austindavid.com
  * 12 May 2014
+ * 02 Apr 2016
  *
  */
  
 #include <Arduino.h>
 
+// this is stupid; when did abs() stop working with floats?
+#define ABS(X) (X > 0 ? X : -X)
+
+// for SoftwareServo convenience
+#include "elapsedMillis.h"
+#define DELAY(N) \
+  { elapsedMillis eM = 0; \
+  while (eM < N) { \
+    SoftwareServo::refresh(); \
+    delay(1); \
+  } }
+
 #include <avr/wdt.h> 
-#include <Wire.h>
-#include <Servo.h>
+#include <SoftwareServo.h>
 #include <EEPROM.h>
 
-#define WIICEIVER_VERSION "2.0 beta4"
+// NEED the RadioHead Library installed!
+// http://www.airspayce.com/mikem/arduino/RadioHead/RadioHead-1.23.zip
+#include <RHReliableDatagram.h>
+#include <RH_NRF24.h>
+#include <SPI.h>
+
+#include "TXRX.h"
+
+
+#define WSB_VERSION "0.1"
 
 // define ALLOW_HELI_MODE to unlock the settable mode & functions
-// #define ALLOW_HELI_MODE
-#undef ALLOW_HELI_MODE
+#define ALLOW_HELI_MODE
+#define FORCE_HELI_MODE
 // leaving it undefined removes all the CODE at compile-time
 
 // addys for vars stored in EEPROM
@@ -55,10 +75,10 @@
 
 #include "watchdog.h"
 
+
 // #define DEBUGGING_PINS
 
 #include "utils.h"
-
 
 #include "Blinker.h"
 
@@ -67,10 +87,7 @@
 #define WII_ACTIVITY_COUNTER 100  // once per 20ms; 50 per second
 #include "Chuck.h"
 
-// #define DEBUGGING_ESC
-// to infrequently insert a small change in the servo pulse, to keep an ESC interested
-// disabled by default
-// #define ESC_JITTER
+#define DEBUGGING_ESC
 #include "ElectronicSpeedController.h"
 
 // #define DEBUGGING_SMOOVER
@@ -81,7 +98,7 @@
 // #define DEBUGGING_CRUISER
 #include "Cruiser.h"
 
-#define DEBUGGING_THROTTLE
+// #define DEBUGGING_THROTTLE
 #include "Throttle.h"
 
 
@@ -121,11 +138,22 @@ void splashScreen() {
 
 // flash the LEDs to indicate throttle position
 void updateLEDs(float throttlePos) {
-  if (abs(throttlePos) < THROTTLE_MIN) {
+  if (ABS(throttlePos) < THROTTLE_MIN) {
+    #ifdef DEBUGGING_BLINKER
+      // seriously, something ate abs() either in the RH libs or SoftwareServo
+      Serial.print(ABS(throttlePos));
+      Serial.print(" <=> ");
+      Serial.print(THROTTLE_MIN);
+      Serial.println(" :. abs(throttlePos) < THROTTLE_MIN");
+    #endif
     green.update(1);
     red.update(1);
   } else {
-    int bps = constrain(abs(int(throttlePos * 20)), 1, 20);
+    int bps = constrain(ABS(int(throttlePos * 20)), 1, 20);
+    #ifdef DEBUGGING_BLINKER
+      Serial.print("bps = ");
+      Serial.println(bps);
+    #endif
     if (throttlePos > 0) {
       green.update(bps);
       red.update(1);
@@ -168,8 +196,8 @@ void freakOut(void) {
       }
     }
     blinkCtr ++;
-    chuck.update();
-    delay(20);
+    chuck.update(10);
+    DELAY(20);
     wdt_reset();
   }
   green.start(1);
@@ -177,41 +205,24 @@ void freakOut(void) {
 } // void freakOut(void)
 
 
-
-void setup_pins() {
-  /*
-  pinMode(ESC_GROUND, OUTPUT);
-  digitalWrite(ESC_GROUND, LOW);
-  pinMode(WII_GROUND, OUTPUT);
-  digitalWrite(WII_GROUND, LOW);
-  */
-  pinMode(pinLocation(WII_POWER_ID), OUTPUT);
-  digitalWrite(pinLocation(WII_POWER_ID), HIGH);
-  
-  pinMode(pinLocation(WII_SCL_ID), INPUT_PULLUP);
-  pinMode(pinLocation(WII_SDA_ID), INPUT_PULLUP);
-
-} // setup_pins()
-
-
 // wait up to 1s for something to happen
 bool waitForActivity(void) {
   unsigned long timer = millis() + 1000;
-#ifdef DEBUGGING
+  #ifdef DEBUGGING
     Serial.print(millis());
     Serial.print(F(" Waiting for activity ... "));
-#endif
+  #endif
   
-  chuck.update();
+  chuck.update(10);
   while (! chuck.isActive() && timer > millis()) {
     wdt_reset();
-    delay(20);
-    chuck.update();
+    DELAY(20);
+    chuck.update(10);
   }
-#ifdef DEBUGGING
+  #ifdef DEBUGGING
     Serial.print(millis());
     Serial.println(chuck.isActive() ? F(": active!") : F(": not active :("));
-#endif
+  #endif
   
   return chuck.isActive();
 } // bool waitForActivity()
@@ -223,12 +234,14 @@ bool startChuck() {
   int tries = 0;
   
   while (tries < 10) {
-#ifdef DEBUGGING
-    Serial.print(F("(Re)starting the nunchuck: #"));
-    Serial.println(tries);
-#endif
+    #ifdef DEBUGGING
+      Serial.print(F("(Re)starting the nunchuck: #"));
+      Serial.println(tries);
+      delay(5);
+    #endif
     wdt_reset();
     chuck.setup();
+    SoftwareServo::refresh();
     chuck.readEEPROM();
     tries ++;
     if (waitForActivity()) {
@@ -267,9 +280,9 @@ void handleInactivity() {
   Serial.println(F("Waiting for 0"));
 #endif  
   while (chuck.Y > 0.1 || chuck.Y < -0.1) {
-    chuck.update();
+    chuck.update(10);
     wdt_reset();
-    delay(20);
+    DELAY(20);
   }
   
 #ifdef DEBUGGING
@@ -286,8 +299,8 @@ void setup() {
   wdt_disable();
   Serial.begin(115200);
 
-  Serial.print(F("Wiiceiver v "));
-  Serial.print(F(WIICEIVER_VERSION));
+  Serial.print(F("Wiiceiver Surf Board v "));
+  Serial.print(F(WSB_VERSION));
   Serial.print(F(" (compiled "));
   Serial.print(F(__DATE__));
   Serial.print(F(" "));
@@ -299,25 +312,29 @@ void setup() {
   green.init(pinLocation(GREEN_LED_ID));
   red.init(pinLocation(RED_LED_ID));
 
-  setup_pins();
-  ESC.init(pinLocation(ESC_PPM_ID), pinLocation(ESC2_PPM_ID));
+  ESC.init(pinLocation(ESC1_PPM_ID), 
+           pinLocation(ESC2_PPM_ID),
+           pinLocation(ESC3_PPM_ID),
+           pinLocation(ESC4_PPM_ID));
   
   splashScreen();
   showTunaSettings();
 
-#ifdef DEBUGGING
-  Serial.println(F("Starting the nunchuck ..."));
-#endif
+  #ifdef DEBUGGING
+    Serial.println(F("Starting the nunchuck ..."));
+  #endif
+  delay(10);
   green.high();
   red.high();
+  setup_txmitter();
   if (! startChuck()) {
  /*   maybeCalibrate();
   } else {*/
     handleInactivity();
   }
-#ifdef DEBUGGING
-  Serial.println(F("Nunchuck is active!"));
-#endif
+  #ifdef DEBUGGING
+    Serial.println(F("Nunchuck is active!"));
+  #endif
 
   green.start(10);
   red.start(10);
@@ -333,10 +350,12 @@ void setup() {
 void loop() {
   static float lastThrottleValue = 0;
   unsigned long startMS = millis();
+  elapsedMillis timeElapsed = 0;
   wdt_reset();
+  SoftwareServo::refresh();
   green.run();
   red.run();
-  chuck.update();
+  chuck.update(10);
 
   // check for the tuning UI
   tuna();
@@ -361,7 +380,8 @@ void loop() {
     if (throttleValue != lastThrottleValue) {
       updateLEDs(throttle.getThrottle());
       #ifdef DEBUGGING
-        Serial.print(F("y="));
+        Serial.print(millis());
+        Serial.print(F(": y="));
         Serial.print(chuck.Y, 4);
         Serial.print(F(", "));
         Serial.print(F("c="));
@@ -374,12 +394,15 @@ void loop() {
       lastThrottleValue = throttleValue;
     } // if (throttleValue != lastThrottleValue)
     
-    int delayMS = constrain(startMS + 21 - millis(), 5, 20);
-    #ifdef DEBUGGING_INTERVALS
-      Serial.print(F("sleeping ")); 
-      Serial.println(delayMS);
-    #endif
-    delay(delayMS);
+    // int delayMS = constrain(startMS + 21 - millis(), 5, 20);
+    if (timeElapsed < 20) {
+      byte delayMS = 20 - timeElapsed;
+      #ifdef DEBUGGING_INTERVALS
+        Serial.print(F("sleeping ")); 
+        Serial.println(delayMS);
+      #endif
+      delay(delayMS);
+    }
   } // if (!chuck.isActive()) - else
 } // loop()
 

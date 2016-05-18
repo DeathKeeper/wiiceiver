@@ -17,8 +17,8 @@
  *
  * http://austindavid.com/wiiceiver
  *  
- * latest software & schematic: 
- *    https://github.com/jaustindavid/wiiceiver
+ * latest software: https://github.com/jaustindavid/wiiceiver
+ * schematic & parts: http://www.digikey.com/schemeit#t9g
  *
  * Enjoy!  Be safe! 
  * 
@@ -29,6 +29,8 @@
  
 #ifndef CHUCK_H
 #define CHUCK_H
+
+#include "TXRX.h"
 
 /*
  *  A "tiny" Wii Nunchuck class
@@ -58,12 +60,6 @@
  * keeping memory down for the ATtiny series.
  *
  */
-
- 
-// #define DEBUGGING_CHUCK
-// #define DEBUGGING_CHUCK_ACTIVITY
-#define WII_ACTIVITY_COUNTER 100  // once per 20ms; 50 per second
- 
 class Chuck {
 #ifndef WII_ACTIVITY_COUNTER
 #define WII_ACTIVITY_COUNTER 250  // consecutive static reads & it's considered inactive
@@ -72,10 +68,10 @@ class Chuck {
 #define DEFAULT_X_ZERO 128
 
 private:
-  int activitySamenessCount;
   byte status[6], lastStatus[6];
   byte Y0, Ymin, Ymax, X0, Xmin, Xmax;
-  
+  word lastActivity, activitySamenessCount;
+  elapsedMillis lastUpdate;
 public:
   float X, Y;
   bool C, Z;
@@ -170,15 +166,13 @@ private:
     }
     
 #ifdef DEBUGGING_CHUCK_ACTIVITY
-    Serial.print("CHUCK: ");
+    Serial.print(F("CHUCK: "));
     for (int i = 0; i < 5; i++) {
-      Serial.print(" [");
+      Serial.print(F(" ["));
       Serial.print(status[i], DEC);
-      Serial.print(",");
-      Serial.print(lastStatus[i], DEC);
-      Serial.print("]");
+      Serial.print(F("]"));
     }
-    Serial.print("; sameness ");
+    Serial.print(F("; sameness "));
     Serial.print(activitySamenessCount);    
     Serial.println();
 #endif
@@ -187,59 +181,38 @@ private:
   } // _computeStatus(void)
 
 
-/********
- * PATTERNS!
- * http://www.codeproject.com/Articles/721796/Design-patterns-in-action-with-Arduino
- ********/
- 
-  // PRIVATE constructor
-  Chuck(void) {
-  } // constructor
-  
-  
-  Chuck(Chuck const&);
-  void operator=(Chuck const&);
-
-
 public:
-
-  // returns the Singleton instance
-  static Chuck* getInstance(void) {
-    static Chuck chuck;   // NB: I don't like this idiom
-    return &chuck;
-  } // Chuck* getInstance()
-  
 
   void readEEPROM() {
     byte storedY;
 
     storedY = EEPROM.read(EEPROM_Y_ADDY);
-#ifdef DEBUGGING_CHUCK
-    Serial.print(F("Reading stored value: Y="));
-    Serial.println(storedY);
-#endif
+    #ifdef DEBUGGING_CHUCK
+      Serial.print(F("Reading stored value: Y="));
+      Serial.println(storedY);
+    #endif
 
     // sanity check: they shouldn't differ by more than 25 units (~10%)
-    if (abs(storedY - DEFAULT_Y_ZERO) <= 25) {
+    if (ABS(storedY - DEFAULT_Y_ZERO) <= 25) {
       Y0 = storedY;
-#ifdef DEBUGGING_CHUCK
-      Serial.println("Using stored value");
-#endif
+      #ifdef DEBUGGING_CHUCK
+        Serial.println(F("Using stored value"));
+      #endif
 } 
     else {
-#ifdef DEBUGGING_CHUCK
-      Serial.println("Ingoring stored value");
-#endif
+      #ifdef DEBUGGING_CHUCK
+        Serial.println(F("Ingoring stored value"));
+      #endif
     }
   } // readEEPROM()
 
 
   void writeEEPROM() {
-    EEPROM.write(EEPROM_Y_ADDY, Y0);
-#ifdef DEBUGGING_CHUCK
-    Serial.print("Storing value: Y=");
-    Serial.println(Y0);	
-#endif	    
+    EEPROM.update(EEPROM_Y_ADDY, Y0);
+    #ifdef DEBUGGING_CHUCK
+      Serial.print(F("Storing value: Y="));
+      Serial.println(Y0);  
+    #endif      
   } // writeEEPROM()
 
 
@@ -254,10 +227,12 @@ public:
     Xmin = Ymin = 15;
     Xmax = Ymax = 200;
 
-#ifdef DEBUGGING_CHUCK
-    Serial.print(millis());
-    Serial.print(": Chuck.setup() ...");
-#endif
+    // radio init; should already be done
+    /*
+    #ifdef DEBUGGING_CHUCK
+        Serial.print(millis());
+        Serial.print(F(": Chuck.setup() ..."));
+    #endif
     Wire.begin();
     Wire.beginTransmission(0x52);       // device address
     Wire.write(0xF0);
@@ -268,26 +243,30 @@ public:
     Wire.write(0xFB);
     Wire.write((uint8_t)0x00);
     Wire.endTransmission();
-#ifdef DEBUGGING_CHUCK
-    Serial.print(" transmitted @ ");
-    Serial.print(millis());
-#endif
+    #ifdef DEBUGGING_CHUCK
+        Serial.print(F(" transmitted @ "));
+        Serial.print(millis());
+    #endif
+    */
 
+    // REFACTOR -- update() shouldn't run so frequently
     // do enough updates to prime the activity checker ...
     for (int i = 0; i < WII_ACTIVITY_COUNTER; i++) {
       update();
       delay(1);
     }
     
- #ifdef DEBUGGING_CHUCK
-    Serial.print("; setup complete @ ");
-    Serial.println(millis());
-#endif   
+     #ifdef DEBUGGING_CHUCK
+        Serial.print(F("; setup complete @ "));
+        Serial.println(millis());
+    #endif   
   } // void setup(void)
 
 
   // update the status[] fields from the nunchuck
+  // ... by receiving a status packet
   void update(void) {
+    /*
     // TODO: estimate the actual delay required between the request 
     // & data available on bus
     // delay(1);
@@ -299,25 +278,42 @@ public:
       status[cnt] = Wire.read();
       cnt++;
     }
+    */
+    
+    byte buf[6]; 
+    byte len = sizeof(buf);
+    byte from;
+    elapsedMillis timeElapsed = 0;
+    while (timeElapsed < 10 && !manager.available()) {
+      // delayMicroseconds(500);
+    }
+    if (manager.available()) {
+      if (manager.recvfrom(buf, &len, &from)) {
+        #ifdef DEBUGGING_CHUCK
+          Serial.print(F("got packet from : 0x"));
+          Serial.println(from, HEX);
+        #endif 
+        lastUpdate = 0;
+        memcpy(status, buf, sizeof(status));
+        _computeStatus();
+        #ifdef DEBUGGING_CHUCK_ACTIVITY
+          Serial.print(F("Active? "));
+          Serial.println(isActive() ? F("yes") : F("no"));
+        #endif
 
-    _computeStatus();
-#ifdef DEBUGGING_CHUCK_ACTIVITY
-   Serial.print("Active? ");
-   Serial.println(isActive() ? "yes" : "no");
-#endif
-
-    // send one 0 to initiate transfer
-    Wire.beginTransmission(0x52); 
-    Wire.write(0);         
-    Wire.endTransmission();
-
+      } else {
+        Serial.println(F("FIX ME: __FILE__ recv failed"));
+      }
+    } else {
+      Serial.println(F("FIX ME: __FILE__ no data available"));
+    }
   } // void update(void)
 
 
   // is the controller "active" -- being held by a human & reporting
   // changing values?
   bool isActive(void) {
-    return activitySamenessCount < WII_ACTIVITY_COUNTER && ! all255s();
+  return lastUpdate < 100 && activitySamenessCount < WII_ACTIVITY_COUNTER && ! all255s();
   } // bool isActive(void)
 
 };
