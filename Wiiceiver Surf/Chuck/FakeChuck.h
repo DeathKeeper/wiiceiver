@@ -45,8 +45,9 @@
 class Chuck {
 
 // ports
-#define Y_POT A3
-#define C_BUTTON A1
+#define Y_POT A2
+#define X_POT A3
+#define C_BUTTON 5 / Yos - changed from A1
 #define Z_BUTTON 4 
 
 #define EEPROM_CHUCK_YMIN (EEPROM_CHUCK + 0)
