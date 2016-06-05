@@ -2,7 +2,7 @@
  * (CC BY-NC-SA 4.0) 
  * http://creativecommons.org/licenses/by-nc-sa/4.0/
  *
- * WARNING WARNING WARNING: attaching motors to a *board is 
+ * WARNING WARNING WARNING: attaching motors to a skateboard is 
  * a terribly dangerous thing to do.  This software is totally
  * for amusement and/or educational purposes.  Don't obtain or
  * make a wiiceiver (see below for instructions and parts), 
@@ -17,12 +17,13 @@
  *
  * http://austindavid.com/wiiceiver
  *  
- * latest software: https://github.com/jaustindavid/wiiceiver
+ * latest software & hardware: https://github.com/jaustindavid/wiiceiver
  *
  * Enjoy!  Be safe! 
  * 
  * (CC BY-NC-SA 4.0) Austin David, austin@austindavid.com
- * 20 Feb 2015
+ * 12 May 2014
+ * 02 Apr 2016
  *
  */
 
@@ -33,13 +34,12 @@
 #define CLIENT_ADDRESS 1
 #define SERVER_ADDRESS 2
 
-// Singleton instance of the radio driver
-RH_NRF24 driver;
-
-// Class to manage message delivery and receipt, using the driver declared above
-RHReliableDatagram manager(driver, SERVER_ADDRESS);
-
-
+  // Singleton instance of the radio driver
+  RH_NRF24 driver(9,10);
+  
+  // Class to manage message delivery and receipt, using the driver declared above
+  RHReliableDatagram manager(driver, SERVER_ADDRESS);
+ 
   struct StatusMessage_t {
     float chuckX, chuckY;    // [-1 .. 1]
     bool buttons[8];         // chuck C, chuck Z, future TBD
@@ -53,10 +53,23 @@ RHReliableDatagram manager(driver, SERVER_ADDRESS);
   
   void setup_txmitter() {
     if (!manager.init()) {
-      Serial.println("init failed");}
-      else{
-      Serial.println("init complete");
+      Serial.println("init failed");
+      // TODO: crash/burn
     }
+    /*
+     * RH_NRF24::DataRate2Mbps
+     * RH_NRF24::DataRate1Mbps
+     * RH_NRF24::DataRate250kbps
+     * 
+     * TransmitPowerm18dBm
+     * TransmitPowerm12dBm
+     * TransmitPowerm6dBm
+     * TransmitPower0dBm
+     */
+    // driver.setRF(RH_NRF24::DataRate2Mbps, RH_NRF24::TransmitPower0dBm);
+    driver.setRF(RH_NRF24::DataRate250kbps, RH_NRF24::TransmitPowerm18dBm); 
   } // setup_txmitter()
+
+  
 
 #endif

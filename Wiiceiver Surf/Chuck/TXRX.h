@@ -36,6 +36,7 @@
 #define EEPROM_TXRX_IDENTITY  11  // 4 bytes
 
 
+
 /*
  * A wrapper class for transmit/receive operations
  * 
@@ -55,7 +56,6 @@ class TXRX {
   private:
     byte address;
     byte identity[4];
-    
   public:
     void init() {
       #ifdef DEBUGGING_TXRX

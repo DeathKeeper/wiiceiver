@@ -107,7 +107,7 @@ public:
     #ifdef ALLOW_HELI_MODE
       if (settings.HELI_MODE) {
         if (level <= 0) {
-          newAngle = 0;
+          newAngle = 0.5;
         } else {
           newAngle = (int)(ESC_MAX_ANGLE * level);
         }

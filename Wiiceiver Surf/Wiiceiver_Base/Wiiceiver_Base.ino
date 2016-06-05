@@ -86,7 +86,7 @@
 #define WII_ACTIVITY_COUNTER 100  // once per 20ms; 50 per second
 #include "Chuck.h"
 
-#define DEBUGGING_ESC
+//#define DEBUGGING_ESC //Yos
 #include "ElectronicSpeedController.h"
 
 // #define DEBUGGING_SMOOVER

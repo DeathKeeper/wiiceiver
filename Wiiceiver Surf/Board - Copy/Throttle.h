@@ -498,7 +498,7 @@ class Throttle {
 
 		  if (throttle >= 0)
 		  {
-			  throttle = upper->smoove(0); // Yos - was 0.5
+			  throttle = upper->smoove(0.5);
 		  }
 		  else
 		  {
@@ -542,7 +542,7 @@ class Throttle {
     
     
     void zero(void) {
-      throttle = 0;
+      throttle = 0.5;// .5;//Yos changed from 0
       upper->zero();
       downer->zero();
       cruiser->zero();

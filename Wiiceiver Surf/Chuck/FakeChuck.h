@@ -45,9 +45,11 @@
 class Chuck {
 
 // ports
-#define Y_POT A3
+#define Y_POT A2// Yos Changed from A3
+#define X_POT A3 // Yos added X pot
 #define C_BUTTON A1
 #define Z_BUTTON 4 
+#define Push_BUTTON 2 // Yos analog push
 
 #define EEPROM_CHUCK_YMIN (EEPROM_CHUCK + 0)
 #define EEPROM_CHUCK_YMAX (EEPROM_CHUCK + sizeof(int))
